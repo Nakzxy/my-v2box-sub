@@ -1,45 +1,641 @@
 <!DOCTYPE html>
-<html lang="km">
+<html lang="km" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="V2Box Updater">
     <title>V2Box Config Updater</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; background: #f4f6f9; color: #333; padding: 20px; text-align: center; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); max-width: 400px; margin: auto; }
-        h2 { color: #007aff; }
-        button { background: #007aff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 15px; }
-        button:active { background: #005ec4; }
-        textarea { width: 100%; height: 100px; margin-top: 15px; border-radius: 8px; border: 1px solid #ccc; padding: 10px; }
+        body {
+            font-family: 'Kantumruy Pro', 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+        .mono {
+            font-family: 'Inter', monospace;
+        }
+        /* Custom subtle scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 9999px;
+        }
     </style>
 </head>
-<body>
-    <div class="card">
-        <h2>V2Box Config Helper</h2>
-        <p>ទាញយក Config ថ្មីៗពីប្រភពសាធារណៈតំបន់អាស៊ី/សាំងហ្គាស្ទ័រ</p>
-        <button onclick="fetchConfigs()">ចុច Update ទាញយក Config</button>
-        <textarea id="output" placeholder="Config ថ្មីនឹងបង្ហាញទីនេះ..."></textarea>
-        <button style="background: #34c759;" onclick="copyText()">Copy Config</button>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-blue-500 selection:text-white">
+
+    <!-- Top Navigation / Header (iOS Safe Area aware) -->
+    <header class="sticky top-0 z-30 bg-slate-900/85 backdrop-blur-xl border-b border-slate-800/80 px-4 pt-4 pb-3">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <!-- Shield / Refresh SVG Icon -->
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold tracking-tight text-white leading-tight">V2Box Updater</h1>
+                    <p class="text-xs text-slate-400">ប្រព័ន្ធគ្រប់គ្រង & Update Config</p>
+                </div>
+            </div>
+            <button id="installGuideBtn" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 transition text-xs font-medium text-cyan-400 border border-slate-700/70 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                ដាក់លើអេក្រង់
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 w-full max-w-md mx-auto px-4 py-5 space-y-5">
+
+        <!-- Step 1: Upload .v2box File Card -->
+        <section class="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold flex items-center justify-center">១</span>
+                    <h2 class="text-sm font-semibold text-white">បញ្ចូល File Config ចាស់ (.v2box / .json)</h2>
+                </div>
+                <span id="fileBadge" class="hidden text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">បានស្គាល់ File</span>
+            </div>
+
+            <!-- File Drop / Tap Zone -->
+            <label for="fileInput" class="block cursor-pointer group">
+                <div class="border-2 border-dashed border-slate-700 group-hover:border-blue-500/70 group-active:scale-[0.99] transition rounded-2xl p-5 text-center bg-slate-950/50">
+                    <div class="w-11 h-11 mx-auto mb-2.5 rounded-2xl bg-slate-800/90 text-blue-400 flex items-center justify-center group-hover:bg-blue-500/20 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <p id="fileNameDisplay" class="text-sm font-medium text-slate-200">ចុចទីនេះដើម្បីរើស File ពី iPhone</p>
+                    <p class="text-xs text-slate-500 mt-1">គាំទ្រ .v2box, .json, .txt (ឧ. vless_Cellcard_.v2box)</p>
+                </div>
+                <input id="fileInput" type="file" class="hidden" accept=".v2box,.json,.txt,*/*">
+            </label>
+
+            <!-- Diagnostics Output for .v2box file -->
+            <div id="fileDiagnostics" class="hidden rounded-2xl bg-slate-950 border border-slate-800/90 p-3.5 space-y-2.5 text-xs">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="text-slate-400 font-medium">ការវិភាគរចនាសម្ព័ន្ធ File</span>
+                    <span id="diagMagic" class="mono text-cyan-400 font-semibold">v2box_export</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-slate-300">
+                    <div class="bg-slate-900/80 p-2 rounded-xl">
+                        <span class="block text-[10px] text-slate-500">ទម្រង់ការពារ (Encryption)</span>
+                        <span id="diagEnc" class="font-medium text-amber-400">AES-GCM Locked</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2 rounded-xl">
+                        <span class="block text-[10px] text-slate-500">ទំហំទិន្នន័យ (Ciphertext)</span>
+                        <span id="diagSize" class="mono font-medium text-slate-200">0 bytes</span>
+                    </div>
+                </div>
+                <!-- Honest Technical Explanation -->
+                <div id="encryptedNotice" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200/90 leading-relaxed">
+                    <strong class="text-amber-300 block mb-0.5">ព័ត៌មានបច្ចេកទេសពិតប្រាកដ៖</strong>
+                    File <span class="mono text-white">.v2box</span> ត្រូវបានចាក់សោដោយកូដសម្ងាត់ផ្ទៃក្នុងរបស់កម្មវិធី V2Box (<span class="mono">ciphertext</span>)។ គ្មានកម្មវិធីខាងក្រៅណាអាចបំបែកសោរ ឬជួសជុល Server ចាស់ដែលងាប់នៅខាងក្នុងបានទេ។ <strong>ដំណោះស្រាយ៖</strong> ចុចប៊ូតុង Update ខាងក្រោមដើម្បីទាញយក Config ថ្មីដែលមានប្រភពពិត ឬបញ្ចូល Config ថ្មីពី Telegram ដើម្បីត្រៀម Copy ចូល V2Box ភ្លាមៗ។
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2: Mode Switcher & Update Action -->
+        <section class="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 text-xs font-bold flex items-center justify-center">២</span>
+                    <h2 class="text-sm font-semibold text-white">ទាញយក ឬ Update Config ថ្មី</h2>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+                <button id="tabFetch" class="py-2 px-3 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow transition">
+                    ទាញយកពីប្រភពផ្ទាល់
+                </button>
+                <button id="tabCustom" class="py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition">
+                    កែ / ដាក់ពី Telegram
+                </button>
+            </div>
+
+            <!-- TAB A: Live Real Public Sources Fetcher -->
+            <div id="panelFetch" class="space-y-3.5">
+                <div class="space-y-2">
+                    <label class="block text-xs text-slate-400">ជ្រើសរើសប្រភព Subscription ពិតប្រាកដ (GitHub Mirrors)</label>
+                    <select id="sourceSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/Sub1.txt">ប្រភពទី ១៖ Barry-Far V2Ray (VLESS / VMess)</option>
+                        <option value="https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list_raw.txt">ប្រភពទី ២៖ NoMoreWalls Raw List</option>
+                        <option value="https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt">ប្រភពទី ៣៖ Ermaozi Auto-Updated Feed</option>
+                    </select>
+                </div>
+
+                <!-- Filter for Singapore / Asia -->
+                <div class="flex items-center justify-between bg-slate-950/70 px-3 py-2.5 rounded-xl border border-slate-800/80">
+                    <div>
+                        <span class="text-xs font-medium text-slate-200 block">ចម្រាញ់យកតែ Server ជិតកម្ពុជា</span>
+                        <span class="text-[11px] text-slate-500">Singapore (SG), Hong Kong (HK), Japan (JP)</span>
+                    </div>
+                    <input id="asiaFilter" type="checkbox" checked class="w-5 h-5 rounded accent-blue-600 cursor-pointer">
+                </div>
+
+                <!-- Big Update Button -->
+                <button id="updateBtn" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 active:scale-[0.98] transition font-bold text-sm text-white shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2">
+                    <svg id="updateIcon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span id="updateBtnText">ចុច Update ទាញយក Config ថ្មី</span>
+                </button>
+
+                <!-- Honest Live Fetch Status -->
+                <div id="fetchStatusBox" class="hidden rounded-xl p-3 text-xs border"></div>
+
+                <!-- Results List -->
+                <div id="resultsContainer" class="hidden space-y-2.5 pt-1">
+                    <div class="flex items-center justify-between">
+                        <span id="resultsCount" class="text-xs font-semibold text-emerald-400">រកឃើញ 0 Configs</span>
+                        <button id="downloadAllBtn" class="text-xs text-cyan-400 hover:underline font-medium">ទាញយកជា File (.txt)</button>
+                    </div>
+                    <div id="configList" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+
+            <!-- TAB B: Paste / Validate & Package Config from Telegram -->
+            <div id="panelCustom" class="hidden space-y-3.5">
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    ប្រសិនបើអ្នកទទួលបានកូដ <span class="mono text-cyan-400">vless://</span> ឬ <span class="mono text-cyan-400">vmess://</span> ថ្មីពី Telegram សូមបិទភ្ជាប់ (Paste) ខាងក្រោម ដើម្បីត្រួតពិនិត្យភាពត្រឹមត្រូវ និងរក្សាទុកជា File សម្រាប់ Import ចូល V2Box៖
+                </p>
+                <textarea id="customConfigInput" rows="4" placeholder="បិទភ្ជាប់ vless://... ឬ vmess://... នៅទីនេះ..." class="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"></textarea>
+
+                <div id="customValidationResult" class="hidden rounded-xl p-3 text-xs border"></div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button id="validateSaveBtn" class="py-3 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 transition text-xs font-bold text-white">
+                        ពិនិត្យ & រក្សាទុក
+                    </button>
+                    <button id="exportTxtBtn" class="py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 transition text-xs font-bold text-cyan-400 border border-slate-700">
+                        ទាញយក File (.txt)
+                    </button>
+                </div>
+
+                <!-- Saved History -->
+                <div id="savedHistorySection" class="hidden pt-2 border-t border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Config ដែលបានរក្សាទុកលើទូរស័ព្ទ</span>
+                        <button id="clearSavedBtn" class="text-[11px] text-rose-400 hover:underline">លុបទាំងអស់</button>
+                    </div>
+                    <div id="savedList" class="space-y-2"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 3: How to Import into V2Box -->
+        <section class="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-4 space-y-2.5">
+            <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center">៣</span>
+                <h3 class="text-xs font-semibold text-slate-200">របៀបដាក់ចូល V2Box លើ iPhone 12</h3>
+            </div>
+            <ol class="text-xs text-slate-400 space-y-1.5 list-decimal list-inside leading-relaxed">
+                <li>ចុចប៊ូតុង <strong class="text-white">Copy</strong> នៅលើ Config ណាមួយខាងលើ។</li>
+                <li>បើកកម្មវិធី <strong class="text-cyan-400">V2Box</strong> -> ចូលថត <strong class="text-white">Configs</strong>។</li>
+                <li>ចុចសញ្ញា <strong class="text-white">+</strong> នៅខាងស្តាំលើ -> រើសយក <strong class="text-emerald-400">Import v2ray uri from clipboard</strong>។</li>
+                <li>ចុច Ping ដើម្បីសាកល្បងល្បឿនពិតប្រាកដមុនពេល Connect។</li>
+            </ol>
+        </section>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 translate-y-3">
+        <div class="bg-slate-800 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-2xl border border-slate-700 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="toastMsg">បានចម្លងរួចរាល់!</span>
+        </div>
+    </div>
+
+    <!-- iOS Add to Home Screen Modal -->
+    <div id="installModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden items-end sm:items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-bold text-white">ដំឡើងជា App លើ iPhone 12</h3>
+                <button id="closeModalBtn" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center">✕</button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                ដើម្បីប្រើប្រាស់កម្មវិធីនេះដូច App ធម្មតាដោយមិនបាច់បើក Safari រាល់ដង សូមធ្វើតាមជំហានងាយៗនេះ៖
+            </p>
+            <div class="space-y-3 text-xs text-slate-300 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    <p>បើកទំព័រនេះនៅក្នុងកម្មវិធី <strong>Safari</strong> លើ iPhone របស់អ្នក។</p>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                    <p>ចុចប៊ូតុង <strong>Share (រូបប្រអប់មានព្រួញឡើងលើ)</strong> នៅរបារខាងក្រោមនៃ Safari។</p>
+                </div>
+                <div class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                    <p>អូសចុះក្រោម រួចចុចពាក្យ <strong>"Add to Home Screen" (បន្ថែមទៅអេក្រង់ដើម)</strong> ហើយចុច <strong>Add</strong>។</p>
+                </div>
+            </div>
+            <button id="gotItBtn" class="w-full py-3 rounded-2xl bg-blue-600 text-white text-xs font-bold">យល់ព្រម</button>
+        </div>
     </div>
 
     <script>
-        async function fetchConfigs() {
-            const output = document.getElementById("output");
-            output.value = "កំពុងទាញយក...";
+        // --- State & Storage ---
+        let fetchedConfigs = [];
+        let savedConfigs = JSON.parse(localStorage.getItem('v2box_saved_configs') || '[]');
+
+        // --- Elements ---
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const fileBadge = document.getElementById('fileBadge');
+        const fileDiagnostics = document.getElementById('fileDiagnostics');
+        const diagMagic = document.getElementById('diagMagic');
+        const diagEnc = document.getElementById('diagEnc');
+        const diagSize = document.getElementById('diagSize');
+        const encryptedNotice = document.getElementById('encryptedNotice');
+
+        const tabFetch = document.getElementById('tabFetch');
+        const tabCustom = document.getElementById('tabCustom');
+        const panelFetch = document.getElementById('panelFetch');
+        const panelCustom = document.getElementById('panelCustom');
+
+        const updateBtn = document.getElementById('updateBtn');
+        const updateIcon = document.getElementById('updateIcon');
+        const updateBtnText = document.getElementById('updateBtnText');
+        const sourceSelect = document.getElementById('sourceSelect');
+        const asiaFilter = document.getElementById('asiaFilter');
+        const fetchStatusBox = document.getElementById('fetchStatusBox');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsCount = document.getElementById('resultsCount');
+        const configList = document.getElementById('configList');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+        const customConfigInput = document.getElementById('customConfigInput');
+        const validateSaveBtn = document.getElementById('validateSaveBtn');
+        const exportTxtBtn = document.getElementById('exportTxtBtn');
+        const customValidationResult = document.getElementById('customValidationResult');
+        const savedHistorySection = document.getElementById('savedHistorySection');
+        const savedList = document.getElementById('savedList');
+        const clearSavedBtn = document.getElementById('clearSavedBtn');
+
+        const installGuideBtn = document.getElementById('installGuideBtn');
+        const installModal = document.getElementById('installModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const gotItBtn = document.getElementById('gotItBtn');
+
+        // --- Utility: Toast Notification ---
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toastMsg.textContent = msg;
+            toast.classList.remove('opacity-0', 'translate-y-3');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-3');
+            }, 2400);
+        }
+
+        // --- Utility: Copy Text (iOS & iFrame safe) ---
+        function copyToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
             try {
-                let res = await fetch("https://raw.githubusercontent.com/freefq/free/master/v2");
-                let text = await res.text();
-                output.value = text.slice(0, 1000) + "\n...(ទាញយកបានสำเร็จ)";
-            } catch(e) {
-                output.value = "មានបញ្ហាในการទាញយក សូមព្យាយាមម្តងទៀត។";
+                document.execCommand('copy');
+                showToast("បានចម្លង Config! សូមបិទភ្ជាប់ក្នុង V2Box");
+            } catch (err) {
+                showToast("មិនអាចចម្លងបានទេ សូមសាកល្បងម្តងទៀត");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // --- Utility: Download File ---
+        function downloadTextFile(filename, content) {
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`កំពុងទាញយក ${filename}`);
+        }
+
+        // --- Step 1: Parse Uploaded .v2box / JSON / Text File ---
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            fileNameDisplay.textContent = file.name;
+            fileBadge.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const rawText = event.target.result.trim();
+                fileDiagnostics.classList.remove('hidden');
+
+                try {
+                    const parsed = JSON.parse(rawText);
+                    if (parsed.magic === 'v2box_export' && parsed.ciphertext) {
+                        diagMagic.textContent = `v2box_export (v${parsed.version || 1})`;
+                        diagEnc.textContent = parsed.isPasswordProtected ? 'Password + AES-GCM' : 'AES-GCM Locked';
+                        diagSize.textContent = `${parsed.ciphertext.length} chars`;
+                        encryptedNotice.classList.remove('hidden');
+                    } else {
+                        diagMagic.textContent = 'JSON Config';
+                        diagEnc.textContent = 'Unencrypted JSON';
+                        diagSize.textContent = `${rawText.length} bytes`;
+                        encryptedNotice.classList.add('hidden');
+                    }
+                } catch (err) {
+                    // Check if plain text containing vless:// or vmess://
+                    const lines = rawText.split(/\r?\n/).filter(l => l.startsWith('vless://') || l.startsWith('vmess://'));
+                    diagMagic.textContent = lines.length > 0 ? 'Plain URI List' : 'Unknown Format';
+                    diagEnc.textContent = lines.length > 0 ? `${lines.length} Links Found` : 'Raw Text';
+                    diagSize.textContent = `${file.size} bytes`;
+                    encryptedNotice.classList.add('hidden');
+
+                    if (lines.length > 0) {
+                        customConfigInput.value = lines.join('\n');
+                        switchTab('custom');
+                        showToast(`រកឃើញ ${lines.length} Configs ក្នុង File!`);
+                    }
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // --- Tab Switching ---
+        function switchTab(tab) {
+            if (tab === 'fetch') {
+                tabFetch.className = "py-2 px-3 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow transition";
+                tabCustom.className = "py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition";
+                panelFetch.classList.remove('hidden');
+                panelCustom.classList.add('hidden');
+            } else {
+                tabCustom.className = "py-2 px-3 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow transition";
+                tabFetch.className = "py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition";
+                panelCustom.classList.remove('hidden');
+                panelFetch.classList.add('hidden');
+                renderSavedConfigs();
             }
         }
-        function copyText() {
-            const output = document.getElementById("output");
-            output.select();
-            document.execCommand("copy");
-            alert("បាន Copy រួចរាល់!");
+        tabFetch.addEventListener('click', () => switchTab('fetch'));
+        tabCustom.addEventListener('click', () => switchTab('custom'));
+
+        // --- Parse Metadata from vless:// or vmess:// ---
+        function parseNodeInfo(uri) {
+            try {
+                if (uri.startsWith('vless://')) {
+                    const urlObj = new URL(uri);
+                    const label = decodeURIComponent(urlObj.hash.replace('#', '')) || `${urlObj.hostname}:${urlObj.port}`;
+                    return {
+                        protocol: 'VLESS',
+                        host: urlObj.hostname,
+                        port: urlObj.port || '443',
+                        label: label,
+                        uri: uri
+                    };
+                } else if (uri.startsWith('vmess://')) {
+                    const b64 = uri.replace('vmess://', '').trim();
+                    const jsonStr = atob(b64);
+                    const data = JSON.parse(jsonStr);
+                    return {
+                        protocol: 'VMess',
+                        host: data.add || 'Unknown Host',
+                        port: data.port || '443',
+                        label: data.ps || `${data.add}:${data.port}`,
+                        uri: uri
+                    };
+                }
+            } catch (e) {
+                return null;
+            }
+            return null;
         }
+
+        // --- Step 2A: Real Live Fetch from GitHub Raw Mirrors ---
+        updateBtn.addEventListener('click', async () => {
+            const url = sourceSelect.value;
+            const filterAsia = asiaFilter.checked;
+
+            // Loading UI
+            updateBtn.disabled = true;
+            updateIcon.classList.add('animate-spin');
+            updateBtnText.textContent = 'កំពុងទាញយកទិន្នន័យពិត...';
+            fetchStatusBox.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+
+            try {
+                const response = await fetch(url, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+                let text = await response.text();
+
+                // Decode base64 if entire subscription is base64 encoded
+                if (!text.includes('vless://') && !text.includes('vmess://')) {
+                    try {
+                        text = atob(text.trim());
+                    } catch (e) {
+                        // Not base64
+                    }
+                }
+
+                const rawLines = text.split(/\r?\n/)
+                    .map(line => line.trim())
+                    .filter(line => line.startsWith('vless://') || line.startsWith('vmess://'));
+
+                let parsedNodes = rawLines.map(parseNodeInfo).filter(Boolean);
+
+                if (filterAsia) {
+                    const asiaKeywords = ['sg', 'singapore', '🇸🇬', 'hk', 'hong', '🇭🇰', 'jp', 'japan', '🇯🇵', 'asia', 'vn', 'th', 'my'];
+                    const filtered = parsedNodes.filter(node => {
+                        const combined = (node.label + ' ' + node.host).toLowerCase();
+                        return asiaKeywords.some(kw => combined.includes(kw));
+                    });
+                    if (filtered.length > 0) {
+                        parsedNodes = filtered;
+                    } else {
+                        fetchStatusBox.className = "rounded-xl p-3 text-xs border bg-amber-500/10 border-amber-500/30 text-amber-200";
+                        fetchStatusBox.textContent = `ទាញយកបាន ${rawLines.length} Configs ពីប្រភពពិត ប៉ុន្តែមិនមានឈ្មោះប្រទេស SG/Asia ច្បាស់លាស់ទេ ដូច្នេះបង្ហាញបញ្ជីទាំងអស់ជំនួសវិញ។`;
+                        fetchStatusBox.classList.remove('hidden');
+                    }
+                }
+
+                fetchedConfigs = parsedNodes.slice(0, 40); // Show up to 40 real nodes
+
+                if (fetchedConfigs.length === 0) {
+                    throw new Error("ប្រភពនេះមិនមានកូដ VLESS ឬ VMess ដែលអាចអានបាននៅពេលនេះទេ។");
+                }
+
+                if (fetchStatusBox.classList.contains('hidden')) {
+                    fetchStatusBox.className = "rounded-xl p-3 text-xs border bg-emerald-500/10 border-emerald-500/30 text-emerald-300";
+                    fetchStatusBox.textContent = `ជោគជ័យ! បានទាញយក Config ពិតប្រាកដចំនួន ${fetchedConfigs.length} ពីប្រភព GitHub ដោយផ្ទាល់។`;
+                    fetchStatusBox.classList.remove('hidden');
+                }
+
+                renderFetchedResults();
+
+            } catch (error) {
+                fetchStatusBox.className = "rounded-xl p-3 text-xs border bg-rose-500/10 border-rose-500/30 text-rose-300 leading-relaxed";
+                fetchStatusBox.innerHTML = `<strong>មិនអាចទាញយកបានទេ៖</strong> ${error.message}<br>សូមពិនិត្យអ៊ីនធឺណិត ឬសាកល្បងជ្រើសរើសប្រភពទី ២ ឬទី ៣ ខាងលើ។`;
+                fetchStatusBox.classList.remove('hidden');
+            } finally {
+                updateBtn.disabled = false;
+                updateIcon.classList.remove('animate-spin');
+                updateBtnText.textContent = 'ចុច Update ទាញយក Config ថ្មី';
+            }
+        });
+
+        function renderFetchedResults() {
+            resultsContainer.classList.remove('hidden');
+            resultsCount.textContent = `បង្ហាញ ${fetchedConfigs.length} Configs`;
+            configList.innerHTML = '';
+
+            fetchedConfigs.forEach((node) => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-950 border border-slate-800/90 rounded-2xl p-3 flex items-center justify-between gap-2.5";
+                card.innerHTML = `
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold mono ${node.protocol === 'VLESS' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}">${node.protocol}</span>
+                            <span class="text-xs font-semibold text-slate-200 truncate">${escapeHtml(node.label)}</span>
+                        </div>
+                        <p class="text-[11px] mono text-slate-500 truncate">${escapeHtml(node.host)}:${escapeHtml(node.port)}</p>
+                    </div>
+                    <button class="copy-node-btn shrink-0 px-3 py-2 rounded-xl bg-slate-800 hover:bg-blue-600 active:scale-95 transition text-xs font-semibold text-white">
+                        Copy
+                    </button>
+                `;
+                card.querySelector('.copy-node-btn').addEventListener('click', () => copyToClipboard(node.uri));
+                configList.appendChild(card);
+            });
+        }
+
+        downloadAllBtn.addEventListener('click', () => {
+            if (fetchedConfigs.length === 0) return;
+            const content = fetchedConfigs.map(n => n.uri).join('\n');
+            downloadTextFile('v2box_updated_configs.txt', content);
+        });
+
+        // --- Step 2B: Validate & Save Custom Config ---
+        validateSaveBtn.addEventListener('click', () => {
+            const raw = customConfigInput.value.trim();
+            if (!raw) {
+                showToast("សូមបិទភ្ជាប់កូដ vless:// ឬ vmess:// ជាមុនសិន");
+                return;
+            }
+
+            const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            const validNodes = lines.map(parseNodeInfo).filter(Boolean);
+
+            customValidationResult.classList.remove('hidden');
+            if (validNodes.length === 0) {
+                customValidationResult.className = "rounded-xl p-3 text-xs border bg-rose-500/10 border-rose-500/30 text-rose-300";
+                customValidationResult.textContent = "ទម្រង់កូដមិនត្រឹមត្រូវទេ! សូមប្រាកដថាកូដចាប់ផ្តើមដោយ vless:// ឬ vmess://";
+                return;
+            }
+
+            customValidationResult.className = "rounded-xl p-3 text-xs border bg-emerald-500/10 border-emerald-500/30 text-emerald-300";
+            customValidationResult.textContent = `ត្រឹមត្រូវ! បានរក្សាទុក ${validNodes.length} Config (${validNodes[0].protocol} - ${validNodes[0].host})។`;
+
+            validNodes.forEach(node => {
+                // Avoid duplicates
+                savedConfigs = savedConfigs.filter(s => s.uri !== node.uri);
+                savedConfigs.unshift({
+                    ...node,
+                    savedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+            });
+
+            savedConfigs = savedConfigs.slice(0, 15);
+            localStorage.setItem('v2box_saved_configs', JSON.stringify(savedConfigs));
+            renderSavedConfigs();
+        });
+
+        exportTxtBtn.addEventListener('click', () => {
+            const raw = customConfigInput.value.trim();
+            if (!raw) {
+                showToast("មិនមានទិន្នន័យសម្រាប់ទាញយកទេ");
+                return;
+            }
+            downloadTextFile('vless_updated_for_v2box.txt', raw);
+        });
+
+        function renderSavedConfigs() {
+            if (savedConfigs.length === 0) {
+                savedHistorySection.classList.add('hidden');
+                return;
+            }
+            savedHistorySection.classList.remove('hidden');
+            savedList.innerHTML = '';
+
+            savedConfigs.forEach(node => {
+                const item = document.createElement('div');
+                item.className = "bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2";
+                item.innerHTML = `
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-bold mono text-cyan-400">${node.protocol}</span>
+                            <span class="text-xs text-slate-200 truncate">${escapeHtml(node.label)}</span>
+                        </div>
+                        <p class="text-[10px] mono text-slate-500 truncate">${escapeHtml(node.host)} • ${node.savedAt}</p>
+                    </div>
+                    <button class="copy-saved-btn px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white text-xs font-semibold transition">
+                        Copy
+                    </button>
+                `;
+                item.querySelector('.copy-saved-btn').addEventListener('click', () => copyToClipboard(node.uri));
+                savedList.appendChild(item);
+            });
+        }
+
+        clearSavedBtn.addEventListener('click', () => {
+            savedConfigs = [];
+            localStorage.removeItem('v2box_saved_configs');
+            renderSavedConfigs();
+            showToast("បានលុបបញ្ជីរក្សាទុករួចរាល់");
+        });
+
+        // --- Modal Controls ---
+        installGuideBtn.addEventListener('click', () => {
+            installModal.classList.remove('hidden');
+            installModal.classList.add('flex');
+        });
+        [closeModalBtn, gotItBtn].forEach(btn => {
+            btn.addEventListener('click', () => {
+                installModal.classList.add('hidden');
+                installModal.classList.remove('flex');
+            });
+        });
+
+        // --- XSS Protection Helper ---
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Initial render of saved items
+        renderSavedConfigs();
     </script>
 </body>
 </html>
